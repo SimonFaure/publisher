@@ -16,18 +16,48 @@ if (post_password_required()) {
         <div class="product-images">
             <?php do_action('woocommerce_before_single_product_summary'); ?>
             <?php woocommerce_show_product_images(); ?>
+
+            <?php
+            $back_cover = get_post_meta(get_the_ID(), '_back_cover_image', true);
+            if ($back_cover) :
+                ?>
+                <div class="back-cover-image" style="margin-top: var(--spacing-md);">
+                    <h4><?php _e('Back Cover', 'publisher-pro'); ?></h4>
+                    <img src="<?php echo esc_url($back_cover); ?>" alt="<?php _e('Back Cover', 'publisher-pro'); ?>" style="width: 100%; border-radius: 4px;">
+                </div>
+                <?php
+            endif;
+            ?>
         </div>
 
         <div class="product-summary">
             <?php woocommerce_template_single_title(); ?>
 
             <?php
-            $author_id = get_post_meta(get_the_ID(), '_book_author_id', true);
-            if ($author_id) {
-                $author_name = get_the_title($author_id);
-                $author_link = get_permalink($author_id);
-                echo '<div class="product-meta">';
-                echo __('By', 'publisher-pro') . ' <a href="' . esc_url($author_link) . '">' . esc_html($author_name) . '</a>';
+            $contributors = get_post_meta(get_the_ID(), '_contributors', true);
+            if (is_array($contributors) && !empty($contributors)) {
+                $role_labels = array(
+                    'writer' => __('Writer', 'publisher-pro'),
+                    'illustrator' => __('Illustrator', 'publisher-pro'),
+                    'model_maker' => __('Model Maker', 'publisher-pro'),
+                    'corrector' => __('Corrector', 'publisher-pro'),
+                    'graphist' => __('Graphic Designer', 'publisher-pro'),
+                    'voice_actor' => __('Voice Actor', 'publisher-pro'),
+                );
+
+                echo '<div class="product-contributors">';
+                foreach ($contributors as $contributor) {
+                    if (!empty($contributor['person_id']) && !empty($contributor['role'])) {
+                        $person_name = get_the_title($contributor['person_id']);
+                        $person_link = get_permalink($contributor['person_id']);
+                        $role_name = isset($role_labels[$contributor['role']]) ? $role_labels[$contributor['role']] : $contributor['role'];
+
+                        echo '<div class="contributor-item">';
+                        echo '<strong>' . esc_html($role_name) . ':</strong> ';
+                        echo '<a href="' . esc_url($person_link) . '">' . esc_html($person_name) . '</a>';
+                        echo '</div>';
+                    }
+                }
                 echo '</div>';
             }
             ?>
@@ -39,14 +69,57 @@ if (post_password_required()) {
             <?php woocommerce_template_single_excerpt(); ?>
 
             <?php
+            $has_ebook = get_post_meta(get_the_ID(), '_has_ebook', true);
+            $ebook_format = get_post_meta(get_the_ID(), '_ebook_format', true);
+            $has_audiobook = get_post_meta(get_the_ID(), '_has_audiobook', true);
+            $audiobook_duration = get_post_meta(get_the_ID(), '_audiobook_duration', true);
+
+            if ($has_ebook || $has_audiobook) :
+                ?>
+                <div class="product-formats">
+                    <?php if ($has_ebook) : ?>
+                        <div class="format-badge ebook-badge">
+                            <span class="format-icon">📱</span>
+                            <span class="format-text"><?php _e('eBook Available', 'publisher-pro'); ?></span>
+                            <?php if ($ebook_format) : ?>
+                                <span class="format-detail"><?php echo strtoupper(esc_html($ebook_format)); ?></span>
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if ($has_audiobook) : ?>
+                        <div class="format-badge audiobook-badge">
+                            <span class="format-icon">🎧</span>
+                            <span class="format-text"><?php _e('Audiobook Available', 'publisher-pro'); ?></span>
+                            <?php if ($audiobook_duration) : ?>
+                                <span class="format-detail"><?php echo esc_html($audiobook_duration); ?></span>
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+                <?php
+            endif;
+
+            $audio_sample = get_post_meta(get_the_ID(), '_audio_sample', true);
+            if ($audio_sample) :
+                ?>
+                <div class="audio-preview-section">
+                    <h4><?php _e('Listen to Sample', 'publisher-pro'); ?></h4>
+                    <audio controls style="width: 100%; max-width: 500px;">
+                        <source src="<?php echo esc_url($audio_sample); ?>" type="audio/mpeg">
+                        <?php _e('Your browser does not support the audio element.', 'publisher-pro'); ?>
+                    </audio>
+                </div>
+                <?php
+            endif;
+
             $preview_content = get_post_meta(get_the_ID(), '_book_preview_content', true);
             $preview_pdf = get_post_meta(get_the_ID(), '_book_preview_pdf', true);
 
             if ($preview_content || $preview_pdf) :
                 ?>
                 <div class="book-preview-section">
-                    <h3><?php _e('Preview Available', 'publisher-pro'); ?></h3>
-                    <p><?php _e('Read a sample chapter before you buy.', 'publisher-pro'); ?></p>
+                    <h4><?php _e('Read Sample Chapter', 'publisher-pro'); ?></h4>
                     <button type="button" class="button preview-button read-preview-btn" data-product-id="<?php echo get_the_ID(); ?>">
                         <?php _e('Read Sample', 'publisher-pro'); ?>
                     </button>

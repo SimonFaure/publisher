@@ -149,6 +149,26 @@ function publisher_pro_register_genre_taxonomy() {
 }
 add_action('init', 'publisher_pro_register_genre_taxonomy');
 
+function publisher_pro_register_contributor_role_taxonomy() {
+    $labels = array(
+        'name' => __('Contributor Roles', 'publisher-pro'),
+        'singular_name' => __('Role', 'publisher-pro'),
+        'menu_name' => __('Roles', 'publisher-pro'),
+    );
+
+    $args = array(
+        'labels' => $labels,
+        'public' => true,
+        'show_ui' => true,
+        'show_admin_column' => false,
+        'hierarchical' => false,
+        'show_in_rest' => true,
+    );
+
+    register_taxonomy('contributor_role', array('book_author'), $args);
+}
+add_action('init', 'publisher_pro_register_contributor_role_taxonomy');
+
 function publisher_pro_add_author_meta_boxes() {
     add_meta_box(
         'author_details',
@@ -227,6 +247,24 @@ add_action('save_post', 'publisher_pro_save_author_details');
 
 function publisher_pro_add_product_meta_boxes() {
     add_meta_box(
+        'product_type_meta',
+        __('Product Type', 'publisher-pro'),
+        'publisher_pro_product_type_callback',
+        'product',
+        'side',
+        'high'
+    );
+
+    add_meta_box(
+        'product_contributors',
+        __('Contributors', 'publisher-pro'),
+        'publisher_pro_contributors_callback',
+        'product',
+        'normal',
+        'high'
+    );
+
+    add_meta_box(
         'book_details',
         __('Book Details', 'publisher-pro'),
         'publisher_pro_book_details_callback',
@@ -236,8 +274,26 @@ function publisher_pro_add_product_meta_boxes() {
     );
 
     add_meta_box(
+        'book_formats',
+        __('eBook & Audiobook', 'publisher-pro'),
+        'publisher_pro_book_formats_callback',
+        'product',
+        'normal',
+        'default'
+    );
+
+    add_meta_box(
+        'book_images',
+        __('Additional Images', 'publisher-pro'),
+        'publisher_pro_book_images_callback',
+        'product',
+        'side',
+        'default'
+    );
+
+    add_meta_box(
         'book_preview',
-        __('Book Preview / Sample Chapter', 'publisher-pro'),
+        __('Preview & Samples', 'publisher-pro'),
         'publisher_pro_book_preview_callback',
         'product',
         'normal',
@@ -245,6 +301,279 @@ function publisher_pro_add_product_meta_boxes() {
     );
 }
 add_action('add_meta_boxes', 'publisher_pro_add_product_meta_boxes');
+
+function publisher_pro_product_type_callback($post) {
+    wp_nonce_field('publisher_pro_product_type', 'publisher_pro_product_type_nonce');
+
+    $product_type = get_post_meta($post->ID, '_product_type', true);
+    if (empty($product_type)) {
+        $product_type = 'book';
+    }
+    ?>
+    <div class="product-type-selection">
+        <p>
+            <label>
+                <input type="radio" name="product_type" value="book" <?php checked($product_type, 'book'); ?>>
+                <?php _e('Book', 'publisher-pro'); ?>
+            </label>
+        </p>
+        <p>
+            <label>
+                <input type="radio" name="product_type" value="art" <?php checked($product_type, 'art'); ?>>
+                <?php _e('Art / Poster', 'publisher-pro'); ?>
+            </label>
+        </p>
+        <p>
+            <label>
+                <input type="radio" name="product_type" value="board_game" <?php checked($product_type, 'board_game'); ?>>
+                <?php _e('Board Game', 'publisher-pro'); ?>
+            </label>
+        </p>
+    </div>
+    <?php
+}
+
+function publisher_pro_contributors_callback($post) {
+    wp_nonce_field('publisher_pro_contributors', 'publisher_pro_contributors_nonce');
+
+    $contributors = get_post_meta($post->ID, '_contributors', true);
+    if (!is_array($contributors)) {
+        $contributors = array();
+    }
+
+    $all_contributors = get_posts(array(
+        'post_type' => 'book_author',
+        'posts_per_page' => -1,
+        'orderby' => 'title',
+        'order' => 'ASC'
+    ));
+
+    $roles = array(
+        'writer' => __('Writer', 'publisher-pro'),
+        'illustrator' => __('Illustrator', 'publisher-pro'),
+        'model_maker' => __('Model Maker', 'publisher-pro'),
+        'corrector' => __('Corrector', 'publisher-pro'),
+        'graphist' => __('Graphic Designer', 'publisher-pro'),
+        'voice_actor' => __('Voice Actor', 'publisher-pro'),
+    );
+    ?>
+    <div id="contributors-list">
+        <?php
+        if (!empty($contributors)) {
+            foreach ($contributors as $index => $contributor) {
+                ?>
+                <div class="contributor-row" style="margin-bottom: 15px; padding: 10px; border: 1px solid #ddd; background: #f9f9f9;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 50px; gap: 10px; align-items: center;">
+                        <select name="contributors[<?php echo $index; ?>][role]" class="regular-text">
+                            <option value=""><?php _e('Select Role', 'publisher-pro'); ?></option>
+                            <?php foreach ($roles as $role_key => $role_label) : ?>
+                                <option value="<?php echo esc_attr($role_key); ?>" <?php selected($contributor['role'], $role_key); ?>>
+                                    <?php echo esc_html($role_label); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <select name="contributors[<?php echo $index; ?>][person_id]" class="regular-text">
+                            <option value=""><?php _e('Select Person', 'publisher-pro'); ?></option>
+                            <?php foreach ($all_contributors as $person) : ?>
+                                <option value="<?php echo esc_attr($person->ID); ?>" <?php selected($contributor['person_id'], $person->ID); ?>>
+                                    <?php echo esc_html($person->post_title); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <button type="button" class="button remove-contributor"><?php _e('Remove', 'publisher-pro'); ?></button>
+                    </div>
+                </div>
+                <?php
+            }
+        }
+        ?>
+    </div>
+    <button type="button" id="add-contributor" class="button"><?php _e('Add Contributor', 'publisher-pro'); ?></button>
+
+    <script>
+    jQuery(document).ready(function($) {
+        var contributorIndex = <?php echo count($contributors); ?>;
+        var roles = <?php echo json_encode($roles); ?>;
+        var contributors = <?php echo json_encode(array_map(function($p) {
+            return array('id' => $p->ID, 'title' => $p->post_title);
+        }, $all_contributors)); ?>;
+
+        $('#add-contributor').on('click', function() {
+            var html = '<div class="contributor-row" style="margin-bottom: 15px; padding: 10px; border: 1px solid #ddd; background: #f9f9f9;">';
+            html += '<div style="display: grid; grid-template-columns: 1fr 1fr 50px; gap: 10px; align-items: center;">';
+            html += '<select name="contributors[' + contributorIndex + '][role]" class="regular-text">';
+            html += '<option value=""><?php _e('Select Role', 'publisher-pro'); ?></option>';
+            $.each(roles, function(key, value) {
+                html += '<option value="' + key + '">' + value + '</option>';
+            });
+            html += '</select>';
+            html += '<select name="contributors[' + contributorIndex + '][person_id]" class="regular-text">';
+            html += '<option value=""><?php _e('Select Person', 'publisher-pro'); ?></option>';
+            $.each(contributors, function(i, person) {
+                html += '<option value="' + person.id + '">' + person.title + '</option>';
+            });
+            html += '</select>';
+            html += '<button type="button" class="button remove-contributor"><?php _e('Remove', 'publisher-pro'); ?></button>';
+            html += '</div></div>';
+
+            $('#contributors-list').append(html);
+            contributorIndex++;
+        });
+
+        $(document).on('click', '.remove-contributor', function() {
+            $(this).closest('.contributor-row').remove();
+        });
+    });
+    </script>
+    <?php
+}
+
+function publisher_pro_book_formats_callback($post) {
+    wp_nonce_field('publisher_pro_book_formats', 'publisher_pro_book_formats_nonce');
+
+    $has_ebook = get_post_meta($post->ID, '_has_ebook', true);
+    $ebook_file = get_post_meta($post->ID, '_ebook_file', true);
+    $ebook_format = get_post_meta($post->ID, '_ebook_format', true);
+
+    $has_audiobook = get_post_meta($post->ID, '_has_audiobook', true);
+    $audiobook_file = get_post_meta($post->ID, '_audiobook_file', true);
+    $audiobook_duration = get_post_meta($post->ID, '_audiobook_duration', true);
+    ?>
+    <table class="form-table">
+        <tr>
+            <th colspan="2">
+                <h3><?php _e('eBook', 'publisher-pro'); ?></h3>
+            </th>
+        </tr>
+        <tr>
+            <th><label for="has_ebook"><?php _e('Has eBook Version', 'publisher-pro'); ?></label></th>
+            <td>
+                <input type="checkbox" id="has_ebook" name="has_ebook" value="1" <?php checked($has_ebook, '1'); ?>>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="ebook_format"><?php _e('eBook Format', 'publisher-pro'); ?></label></th>
+            <td>
+                <select id="ebook_format" name="ebook_format" class="regular-text">
+                    <option value=""><?php _e('Select Format', 'publisher-pro'); ?></option>
+                    <option value="pdf" <?php selected($ebook_format, 'pdf'); ?>>PDF</option>
+                    <option value="epub" <?php selected($ebook_format, 'epub'); ?>>EPUB</option>
+                    <option value="mobi" <?php selected($ebook_format, 'mobi'); ?>>MOBI</option>
+                    <option value="azw3" <?php selected($ebook_format, 'azw3'); ?>>AZW3</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="ebook_file"><?php _e('eBook File URL', 'publisher-pro'); ?></label></th>
+            <td>
+                <input type="url" id="ebook_file" name="ebook_file" value="<?php echo esc_url($ebook_file); ?>" class="regular-text">
+                <button type="button" class="button upload-ebook-file"><?php _e('Upload File', 'publisher-pro'); ?></button>
+                <p class="description"><?php _e('Upload the eBook file (for digital downloads).', 'publisher-pro'); ?></p>
+            </td>
+        </tr>
+        <tr>
+            <th colspan="2">
+                <h3><?php _e('Audiobook', 'publisher-pro'); ?></h3>
+            </th>
+        </tr>
+        <tr>
+            <th><label for="has_audiobook"><?php _e('Has Audiobook Version', 'publisher-pro'); ?></label></th>
+            <td>
+                <input type="checkbox" id="has_audiobook" name="has_audiobook" value="1" <?php checked($has_audiobook, '1'); ?>>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="audiobook_file"><?php _e('Audiobook File URL', 'publisher-pro'); ?></label></th>
+            <td>
+                <input type="url" id="audiobook_file" name="audiobook_file" value="<?php echo esc_url($audiobook_file); ?>" class="regular-text">
+                <button type="button" class="button upload-audiobook-file"><?php _e('Upload File', 'publisher-pro'); ?></button>
+                <p class="description"><?php _e('Upload the audiobook file (MP3, M4A, etc.).', 'publisher-pro'); ?></p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="audiobook_duration"><?php _e('Duration', 'publisher-pro'); ?></label></th>
+            <td>
+                <input type="text" id="audiobook_duration" name="audiobook_duration" value="<?php echo esc_attr($audiobook_duration); ?>" class="regular-text" placeholder="e.g., 5h 23min">
+                <p class="description"><?php _e('Total audiobook duration.', 'publisher-pro'); ?></p>
+            </td>
+        </tr>
+    </table>
+    <script>
+    jQuery(document).ready(function($) {
+        $('.upload-ebook-file').click(function(e) {
+            e.preventDefault();
+            var custom_uploader = wp.media({
+                title: '<?php _e('Choose eBook File', 'publisher-pro'); ?>',
+                button: { text: '<?php _e('Use this file', 'publisher-pro'); ?>' },
+                multiple: false
+            }).on('select', function() {
+                var attachment = custom_uploader.state().get('selection').first().toJSON();
+                $('#ebook_file').val(attachment.url);
+            }).open();
+        });
+
+        $('.upload-audiobook-file').click(function(e) {
+            e.preventDefault();
+            var custom_uploader = wp.media({
+                title: '<?php _e('Choose Audiobook File', 'publisher-pro'); ?>',
+                library: { type: 'audio' },
+                button: { text: '<?php _e('Use this file', 'publisher-pro'); ?>' },
+                multiple: false
+            }).on('select', function() {
+                var attachment = custom_uploader.state().get('selection').first().toJSON();
+                $('#audiobook_file').val(attachment.url);
+            }).open();
+        });
+    });
+    </script>
+    <?php
+}
+
+function publisher_pro_book_images_callback($post) {
+    wp_nonce_field('publisher_pro_book_images', 'publisher_pro_book_images_nonce');
+
+    $back_cover = get_post_meta($post->ID, '_back_cover_image', true);
+    ?>
+    <div class="back-cover-field">
+        <p><strong><?php _e('Back Cover', 'publisher-pro'); ?></strong></p>
+        <div id="back-cover-preview" style="margin-bottom: 10px;">
+            <?php if ($back_cover) : ?>
+                <img src="<?php echo esc_url($back_cover); ?>" style="max-width: 100%; height: auto;">
+            <?php endif; ?>
+        </div>
+        <input type="hidden" id="back_cover_image" name="back_cover_image" value="<?php echo esc_url($back_cover); ?>">
+        <button type="button" class="button upload-back-cover"><?php _e('Upload Back Cover', 'publisher-pro'); ?></button>
+        <?php if ($back_cover) : ?>
+            <button type="button" class="button remove-back-cover"><?php _e('Remove', 'publisher-pro'); ?></button>
+        <?php endif; ?>
+    </div>
+    <script>
+    jQuery(document).ready(function($) {
+        $('.upload-back-cover').click(function(e) {
+            e.preventDefault();
+            var custom_uploader = wp.media({
+                title: '<?php _e('Choose Back Cover Image', 'publisher-pro'); ?>',
+                library: { type: 'image' },
+                button: { text: '<?php _e('Use this image', 'publisher-pro'); ?>' },
+                multiple: false
+            }).on('select', function() {
+                var attachment = custom_uploader.state().get('selection').first().toJSON();
+                $('#back_cover_image').val(attachment.url);
+                $('#back-cover-preview').html('<img src="' + attachment.url + '" style="max-width: 100%; height: auto;">');
+                $('.remove-back-cover').show();
+            }).open();
+        });
+
+        $('.remove-back-cover').click(function(e) {
+            e.preventDefault();
+            $('#back_cover_image').val('');
+            $('#back-cover-preview').html('');
+            $(this).hide();
+        });
+    });
+    </script>
+    <?php
+}
 
 function publisher_pro_book_details_callback($post) {
     wp_nonce_field('publisher_pro_book_details', 'publisher_pro_book_details_nonce');
@@ -301,6 +630,7 @@ function publisher_pro_book_preview_callback($post) {
 
     $preview_content = get_post_meta($post->ID, '_book_preview_content', true);
     $preview_pdf = get_post_meta($post->ID, '_book_preview_pdf', true);
+    $audio_sample = get_post_meta($post->ID, '_audio_sample', true);
     ?>
     <table class="form-table">
         <tr>
@@ -316,6 +646,19 @@ function publisher_pro_book_preview_callback($post) {
                 <input type="url" id="book_preview_pdf" name="book_preview_pdf" value="<?php echo esc_url($preview_pdf); ?>" class="regular-text">
                 <button type="button" class="button upload-preview-pdf"><?php _e('Upload PDF', 'publisher-pro'); ?></button>
                 <p class="description"><?php _e('Upload a PDF file for book preview/sample chapter.', 'publisher-pro'); ?></p>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="audio_sample"><?php _e('Audio Sample (for Audiobooks)', 'publisher-pro'); ?></label></th>
+            <td>
+                <input type="url" id="audio_sample" name="audio_sample" value="<?php echo esc_url($audio_sample); ?>" class="regular-text">
+                <button type="button" class="button upload-audio-sample"><?php _e('Upload Audio', 'publisher-pro'); ?></button>
+                <p class="description"><?php _e('Upload an audio sample for customers to listen before buying.', 'publisher-pro'); ?></p>
+                <?php if ($audio_sample) : ?>
+                    <audio controls style="margin-top: 10px; max-width: 100%;">
+                        <source src="<?php echo esc_url($audio_sample); ?>" type="audio/mpeg">
+                    </audio>
+                <?php endif; ?>
             </td>
         </tr>
     </table>
@@ -334,6 +677,19 @@ function publisher_pro_book_preview_callback($post) {
                 $('#book_preview_pdf').val(attachment.url);
             }).open();
         });
+
+        $('.upload-audio-sample').click(function(e) {
+            e.preventDefault();
+            var custom_uploader = wp.media({
+                title: '<?php _e('Choose Audio Sample', 'publisher-pro'); ?>',
+                library: { type: 'audio' },
+                button: { text: '<?php _e('Use this audio', 'publisher-pro'); ?>' },
+                multiple: false
+            }).on('select', function() {
+                var attachment = custom_uploader.state().get('selection').first().toJSON();
+                $('#audio_sample').val(attachment.url);
+            }).open();
+        });
     });
     </script>
     <?php
@@ -346,6 +702,29 @@ function publisher_pro_save_product_details($post_id) {
 
     if (!current_user_can('edit_post', $post_id)) {
         return;
+    }
+
+    if (isset($_POST['publisher_pro_product_type_nonce']) && wp_verify_nonce($_POST['publisher_pro_product_type_nonce'], 'publisher_pro_product_type')) {
+        if (isset($_POST['product_type'])) {
+            update_post_meta($post_id, '_product_type', sanitize_text_field($_POST['product_type']));
+        }
+    }
+
+    if (isset($_POST['publisher_pro_contributors_nonce']) && wp_verify_nonce($_POST['publisher_pro_contributors_nonce'], 'publisher_pro_contributors')) {
+        if (isset($_POST['contributors']) && is_array($_POST['contributors'])) {
+            $contributors = array();
+            foreach ($_POST['contributors'] as $contributor) {
+                if (!empty($contributor['role']) && !empty($contributor['person_id'])) {
+                    $contributors[] = array(
+                        'role' => sanitize_text_field($contributor['role']),
+                        'person_id' => absint($contributor['person_id'])
+                    );
+                }
+            }
+            update_post_meta($post_id, '_contributors', $contributors);
+        } else {
+            delete_post_meta($post_id, '_contributors');
+        }
     }
 
     if (isset($_POST['publisher_pro_book_details_nonce']) && wp_verify_nonce($_POST['publisher_pro_book_details_nonce'], 'publisher_pro_book_details')) {
@@ -370,6 +749,34 @@ function publisher_pro_save_product_details($post_id) {
         }
     }
 
+    if (isset($_POST['publisher_pro_book_formats_nonce']) && wp_verify_nonce($_POST['publisher_pro_book_formats_nonce'], 'publisher_pro_book_formats')) {
+        update_post_meta($post_id, '_has_ebook', isset($_POST['has_ebook']) ? '1' : '0');
+
+        if (isset($_POST['ebook_format'])) {
+            update_post_meta($post_id, '_ebook_format', sanitize_text_field($_POST['ebook_format']));
+        }
+
+        if (isset($_POST['ebook_file'])) {
+            update_post_meta($post_id, '_ebook_file', esc_url_raw($_POST['ebook_file']));
+        }
+
+        update_post_meta($post_id, '_has_audiobook', isset($_POST['has_audiobook']) ? '1' : '0');
+
+        if (isset($_POST['audiobook_file'])) {
+            update_post_meta($post_id, '_audiobook_file', esc_url_raw($_POST['audiobook_file']));
+        }
+
+        if (isset($_POST['audiobook_duration'])) {
+            update_post_meta($post_id, '_audiobook_duration', sanitize_text_field($_POST['audiobook_duration']));
+        }
+    }
+
+    if (isset($_POST['publisher_pro_book_images_nonce']) && wp_verify_nonce($_POST['publisher_pro_book_images_nonce'], 'publisher_pro_book_images')) {
+        if (isset($_POST['back_cover_image'])) {
+            update_post_meta($post_id, '_back_cover_image', esc_url_raw($_POST['back_cover_image']));
+        }
+    }
+
     if (isset($_POST['publisher_pro_book_preview_nonce']) && wp_verify_nonce($_POST['publisher_pro_book_preview_nonce'], 'publisher_pro_book_preview')) {
         if (isset($_POST['book_preview_content'])) {
             update_post_meta($post_id, '_book_preview_content', wp_kses_post($_POST['book_preview_content']));
@@ -377,6 +784,10 @@ function publisher_pro_save_product_details($post_id) {
 
         if (isset($_POST['book_preview_pdf'])) {
             update_post_meta($post_id, '_book_preview_pdf', esc_url_raw($_POST['book_preview_pdf']));
+        }
+
+        if (isset($_POST['audio_sample'])) {
+            update_post_meta($post_id, '_audio_sample', esc_url_raw($_POST['audio_sample']));
         }
     }
 }
@@ -410,7 +821,8 @@ function publisher_pro_custom_product_columns($columns) {
     foreach ($columns as $key => $value) {
         $new_columns[$key] = $value;
         if ($key === 'name') {
-            $new_columns['book_author'] = __('Author', 'publisher-pro');
+            $new_columns['product_type_col'] = __('Type', 'publisher-pro');
+            $new_columns['contributors_col'] = __('Contributors', 'publisher-pro');
             $new_columns['book_series'] = __('Series', 'publisher-pro');
         }
     }
@@ -419,10 +831,35 @@ function publisher_pro_custom_product_columns($columns) {
 add_filter('manage_edit-product_columns', 'publisher_pro_custom_product_columns');
 
 function publisher_pro_custom_product_column_content($column, $post_id) {
-    if ($column === 'book_author') {
-        $author_id = get_post_meta($post_id, '_book_author_id', true);
-        if ($author_id) {
-            echo get_the_title($author_id);
+    if ($column === 'product_type_col') {
+        $product_type = get_post_meta($post_id, '_product_type', true);
+        if (!empty($product_type)) {
+            $types = array(
+                'book' => __('Book', 'publisher-pro'),
+                'art' => __('Art', 'publisher-pro'),
+                'board_game' => __('Board Game', 'publisher-pro'),
+            );
+            echo isset($types[$product_type]) ? $types[$product_type] : '-';
+        } else {
+            echo '-';
+        }
+    }
+
+    if ($column === 'contributors_col') {
+        $contributors = get_post_meta($post_id, '_contributors', true);
+        if (is_array($contributors) && !empty($contributors)) {
+            $names = array();
+            foreach (array_slice($contributors, 0, 2) as $contributor) {
+                if (!empty($contributor['person_id'])) {
+                    $names[] = get_the_title($contributor['person_id']);
+                }
+            }
+            echo implode(', ', $names);
+            if (count($contributors) > 2) {
+                echo ' +' . (count($contributors) - 2);
+            }
+        } else {
+            echo '-';
         }
     }
 
